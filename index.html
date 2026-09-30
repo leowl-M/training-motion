@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOTO — animazioni di testo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@100..900&family=Archivo:wght@100..900&family=Archivo+Black&family=Space+Grotesk:wght@300..700&family=Syne:wght@400..800&family=Unbounded:wght@200..900&family=Bricolage+Grotesque:wght@200..800&family=Big+Shoulders+Display:wght@100..900&family=Anton&family=Fraunces:wght@100..900&family=Playfair+Display:wght@400..900&family=Instrument+Serif&family=DM+Serif+Display&family=JetBrains+Mono:wght@100..800&family=IBM+Plex+Mono:wght@300;400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><b></b>MOTO<small>kit di animazione tipografica</small></div>
+  <div class="grp"><span>Formato</span><div class="seg" id="fmtSeg"></div></div>
+  <div class="grp"><span>Qualità</span><div class="seg" id="resSeg"></div></div>
+  <div class="grp"><span>FPS</span><select class="in" id="fpsSel"></select></div>
+  <div class="sp"></div>
+  <div class="grp">
+    <button class="ib" id="bUndo" data-tip="Annulla · ⌘Z" aria-label="Annulla"><i data-lucide="undo-2"></i></button>
+    <button class="ib" id="bRedo" data-tip="Ripeti · ⇧⌘Z" aria-label="Ripeti"><i data-lucide="redo-2"></i></button>
+  </div>
+  <div class="grp">
+    <button class="btn" id="bNew" data-tip="Nuovo progetto (annullabile)"><i data-lucide="file-plus"></i>Nuovo</button>
+    <button class="btn" id="bLoad" data-tip="Carica un preset .json"><i data-lucide="folder-open"></i>Apri</button>
+    <button class="btn" id="bSave" data-tip="Salva preset · ⌘S"><i data-lucide="save"></i>Salva</button>
+    <input type="file" id="fLoad" accept=".json,application/json" hidden>
+  </div>
+  <div class="grp rel">
+    <button class="btn pri" id="bExport" data-tip="Esporta · E"><i data-lucide="download"></i>Esporta</button>
+    <div class="menu" id="expMenu">
+      <button data-x="video"><span><i data-lucide="film"></i>Video</span><small id="vidHint">MP4 o WebM, in tempo reale</small></button>
+      <button data-x="seq"><span><i data-lucide="images"></i>Sequenza PNG (.zip)</span><small id="seqHint">Frame esatti, con trasparenza. Ideale per After Effects</small></button>
+      <button data-x="frame"><span><i data-lucide="image"></i>Frame corrente (.png)</span><small>Il fotogramma sotto la testina</small></button>
+    </div>
+  </div>
+  <button class="ib" id="bHelp" data-tip="Scorciatoie · ?" aria-label="Scorciatoie da tastiera"><i data-lucide="keyboard"></i></button>
+</header>
+<main>
+  <aside class="lib">
+    <div class="libhead">
+      <div class="seg" id="tgtSeg"><button data-t="in" class="on">Assegna a entrata</button><button data-t="out">a uscita</button></div>
+      <input class="in" id="q" type="search" placeholder="Cerca effetto" aria-label="Cerca effetto">
+    </div>
+    <div id="lib"></div>
+  </aside>
+  <section class="stagecol">
+    <div class="stagewrap" id="stageWrap">
+      <div class="stageinfo" id="stageInfo"></div>
+      <canvas id="cv" width="1920" height="1080"></canvas>
+    </div>
+    <div class="transport">
+      <div class="tbar">
+        <button class="ib" id="bStart" data-tip="Inizio · Home" aria-label="Inizio"><i data-lucide="skip-back"></i></button>
+        <button class="ib" id="bPrev" data-tip="Frame precedente · ←" aria-label="Frame precedente"><i data-lucide="chevron-left"></i></button>
+        <button class="ib on" id="bPlay" data-tip="Play / pausa · Spazio" aria-label="Play / pausa"><i data-lucide="play" class="i-play"></i><i data-lucide="pause" class="i-pause"></i></button>
+        <button class="ib" id="bNext" data-tip="Frame successivo · →" aria-label="Frame successivo"><i data-lucide="chevron-right"></i></button>
+        <button class="ib" id="bKey" data-tip="Keyframe alla testina · K" aria-label="Aggiungi keyframe"><i data-lucide="diamond-plus"></i></button>
+        <div class="tc" id="tc">0:00<span>:00</span></div>
+        <div class="sp"></div>
+        <label class="grp" data-tip="Ripeti in loop"><i data-lucide="repeat" class="gi"></i><span>Loop</span><span class="sw"><input type="checkbox" id="cLoop" checked><span></span></span></label>
+        <label class="grp" data-tip="Aree sicure · G"><i data-lucide="layout-grid" class="gi"></i><span>Guide</span><span class="sw"><input type="checkbox" id="cGuide"><span></span></span></label>
+      </div>
+      <div class="timeline" id="tl"><div class="segs" id="segs"></div><div class="ticks" id="ticks"></div><div class="hds" id="hds"></div><div class="kfs" id="kfs"></div><div class="ph" id="ph"></div></div>
+    </div>
+  </section>
+  <aside class="insp" id="insp"></aside>
+</main>
+</div>
+<div class="modal" id="modal"><div class="mbox"><h3 id="mTitle">Esportazione</h3><div class="note" id="mNote"></div><div class="pbar"><i id="mBar"></i></div><div class="bline"><button class="btn" id="mCancel">Annulla</button></div></div></div>
+<div class="modal" id="help"><div class="mbox"><h3>Scorciatoie da tastiera</h3>
+  <dl class="keys">
+    <dt><kbd>Spazio</kbd></dt><dd>Play / pausa</dd>
+    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Frame precedente / successivo</dd>
+    <dt><kbd>⇧</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt><dd>Salta di 10 frame</dd>
+    <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>Inizio / fine clip</dd>
+    <dt><kbd>K</kbd></dt><dd>Keyframe alla testina</dd>
+    <dt><kbd>G</kbd></dt><dd>Mostra / nascondi guide</dd>
+    <dt><kbd>E</kbd></dt><dd>Menu esporta</dd>
+    <dt><kbd>⌘</kbd> <kbd>Z</kbd></dt><dd>Annulla</dd>
+    <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>Z</kbd></dt><dd>Ripeti</dd>
+    <dt><kbd>⌘</kbd> <kbd>S</kbd></dt><dd>Salva preset</dd>
+    <dt><kbd>?</kbd></dt><dd>Questa finestra</dd>
+    <dt><kbd>Trascina</kbd></dt><dd>Sul nome di un parametro: regola il valore (<kbd>⇧</kbd> fine, <kbd>⌥</kbd> finissimo)</dd>
+    <dt><kbd>Doppio clic</kbd></dt><dd>Sul nome di un parametro: valore predefinito</dd>
+  </dl>
+  <div class="note">Il progetto si salva da solo in questo browser a ogni modifica.</div>
+  <div class="bline"><button class="btn" id="helpClose">Chiudi</button></div></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
