@@ -63,7 +63,28 @@
         <label class="grp" data-tip="Ripeti in loop"><i data-lucide="repeat" class="gi"></i><span>Loop</span><span class="sw"><input type="checkbox" id="cLoop" checked><span></span></span></label>
         <label class="grp" data-tip="Aree sicure · G"><i data-lucide="layout-grid" class="gi"></i><span>Guide</span><span class="sw"><input type="checkbox" id="cGuide"><span></span></span></label>
       </div>
-      <div class="timeline" id="tl"><div class="segs" id="segs"></div><div class="ticks" id="ticks"></div><div class="hds" id="hds"></div><div class="kfs" id="kfs"></div><div class="ph" id="ph"></div></div>
+      <div class="tl-tools">
+        <strong>Timeline <span id="trackCount"></span></strong>
+        <button class="btn sm" id="tlAdd">+ Testo</button>
+        <button class="btn sm" id="tlDuplicate">Duplica testo</button>
+        <div class="sp"></div>
+        <label class="grp"><input type="checkbox" id="tlSnap" checked> Aggancia</label>
+        <div class="grp tl-zoom"><button class="ib" id="zoomOut" aria-label="Riduci zoom timeline">−</button><output id="zoomValue">100%</output><button class="ib" id="zoomIn" aria-label="Aumenta zoom timeline">+</button><button class="btn sm" id="zoomFit">Adatta</button></div>
+      </div>
+      <div class="tl-tools tl-edit-tools">
+        <button class="btn sm" id="prevKey" title="Keyframe precedente · [">‹ ◇</button>
+        <button class="btn sm" id="nextKey" title="Keyframe successivo · ]">◇ ›</button>
+        <button class="btn sm" id="copyKey">Copia keyframe</button>
+        <button class="btn sm" id="pasteKey">Incolla</button>
+        <button class="btn sm" id="addMarker" title="Aggiungi marker · M">+ Marker</button>
+        <div class="sp"></div>
+        <label class="grp"><input type="checkbox" id="rangeEnabled"> Intervallo anteprima</label>
+        <button class="btn sm" id="rangeIn" title="Inizio intervallo alla testina · I">In</button>
+        <button class="btn sm" id="rangeOut" title="Fine intervallo alla testina · O">Out</button>
+        <output id="rangeLabel"></output>
+      </div>
+      <div class="tl-scroll" id="tlScroll" tabindex="0" aria-label="Timeline multitraccia. Trascina le clip per spostarle e i bordi delle fasi per regolarne la durata."><div class="timeline" id="tl"></div></div>
+      <div class="tl-footer"><span id="tlHint">Trascina le clip per spostarle · i bordi regolano le fasi · Alt sospende l’aggancio</span><div class="marker-editor" id="markerEditor" hidden><label for="markerName">Marker</label><input class="in" id="markerName" type="text" maxlength="60" aria-label="Nome marker"><button class="btn sm" id="deleteMarker">Elimina marker</button></div></div>
     </div>
   </section>
   <aside class="insp" id="insp"></aside>
@@ -77,6 +98,12 @@
     <dt><kbd>⇧</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt><dd>Salta di 10 frame</dd>
     <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>Inizio / fine clip</dd>
     <dt><kbd>K</kbd></dt><dd>Keyframe alla testina</dd>
+    <dt><kbd>M</kbd></dt><dd>Marker alla testina</dd>
+    <dt><kbd>I</kbd> <kbd>O</kbd></dt><dd>Inizio / fine intervallo di anteprima</dd>
+    <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Keyframe precedente / successivo</dd>
+    <dt><kbd>⌘</kbd> <kbd>C</kbd> / <kbd>V</kbd></dt><dd>Copia / incolla il keyframe selezionato</dd>
+    <dt><kbd>⌫</kbd></dt><dd>Elimina il keyframe o marker selezionato</dd>
+    <dt><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></dt><dd>Zoom timeline / adatta</dd>
     <dt><kbd>G</kbd></dt><dd>Mostra / nascondi guide</dd>
     <dt><kbd>E</kbd></dt><dd>Menu esporta</dd>
     <dt><kbd>⌘</kbd> <kbd>Z</kbd></dt><dd>Annulla</dd>
@@ -90,6 +117,8 @@
   <div class="bline"><button class="btn" id="helpClose">Chiudi</button></div></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
+<script src="timeline.js"></script>
+<script src="effects-extra.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

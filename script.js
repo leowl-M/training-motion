@@ -76,6 +76,7 @@ function pieces(u,n){n=Math.round(n);const key=`${u.i}|${n}|${u.w.toFixed(1)}|${
 /* ============================================================ effects: transitions
    f(s,p,u,o): p = 0 nascosto/inizio → 1 posizione di riposo (può superare 1 con easing back/elastic) */
 const FX=[
+...extraTransitions(),
 /* --- Movimento --- */
 {id:'slide',n:'Scorrimento',c:'Movimento',d:'Entra scorrendo da una direzione, con o senza dissolvenza.',rec:{split:'char',stagger:.45,ease:'outExpo'},
  p:[sel('dir','Provenienza',DIRS,'B'),rng('dist','Distanza',0,6,.7,.01,'em'),bool('fade','Dissolvenza',true)],
@@ -289,6 +290,7 @@ const FX=[
    f(s,t,u,o,env) — applicati sopra la transizione */
 const LOOPS=[
 {id:'none',n:'Nessuno',p:[],f(){}},
+...extraLoops(),
 {id:'wave',n:'Onda continua',d:'Ondulazione continua lungo il testo.',p:[rng('amp','Ampiezza',0,1,.1,.005,'em'),rng('hz','Velocità',0,4,.7,.01,'Hz'),rng('ph','Sfasamento',0,2,.35,.01),sel('ax','Asse',[['y','Verticale'],['x','Orizzontale'],['r','Rotazione']],'y')],
  f(s,t,u,o,e){const v=Math.sin(TAU*o.hz*t-u.i*o.ph)*e;if(o.ax==='y')s.y+=v*o.amp*G.E;else if(o.ax==='x')s.x+=v*o.amp*G.E;else s.rot+=v*o.amp*60}},
 {id:'float',n:'Galleggiamento',d:'Movimento organico lento, ogni pezzo con la sua fase.',p:[rng('amp','Ampiezza',0,.5,.04,.005,'em'),rng('sp','Velocità',0,2,.35,.01,'Hz'),rng('rot','Rotazione',0,20,2,.1,'°')],
@@ -335,6 +337,7 @@ function defaults(){return{
  loop:{fx:'none',when:'hold',prms:{}},
  images:[],layers:[],imgH:1.25,imgTint:false,
  blocks:[],cur:0,
+ timeline:{markers:[],range:{enabled:false,start:0,end:0}},
 }}
 let S=defaults();
 function prmOf(slot,list){const fx=list[slot.fx]||list[Object.keys(list)[0]];if(!slot.prms)slot.prms={};if(!slot.prms[slot.fx])slot.prms[slot.fx]={};const o=slot.prms[slot.fx];for(const d of fx.p)if(o[d.k]===undefined)o[d.k]=d.v;return o}
@@ -342,7 +345,7 @@ function prmOf(slot,list){const fx=list[slot.fx]||list[Object.keys(list)[0]];if(
 const TEXTK=['text','font','wght','italic','fs','fit','fitW','track','lh','align','tcase','color','colorB','stroke','strokeW','colorIn','anchor','margin','offX','offY','block','delay','dIn','hold','dOut','tail','inS','outMode','outS','loop','imgH','imgTint'];
 const GLOBALK=['fmt','res','fps','bg','transparent','seed','images','layers'];
 const pickText=o=>{const r={};for(const k of TEXTK)r[k]=o[k];return r};
-function clipTotal(st=S){let m=timing(st).total;if(st.blocks&&st.blocks.length>1)st.blocks.forEach((b,i)=>{if(i!==st.cur)m=Math.max(m,timing({...st,...b}).total)});return m}
+function clipTotal(st=S){let m=timing(st).total;if(st.blocks&&st.blocks.length>1)st.blocks.forEach((b,i)=>{if(i!==st.cur)m=Math.max(m,timing({...st,...b}).total)});for(const L of st.layers||[])m=Math.max(m,L.end>0?L.end:L.start+L.dIn);return Math.max(1/st.fps,m)}
 function timing(S){const inS=S.delay,outS=S.delay+S.dIn+S.hold,on=S.outMode!=='none';return{inS,holdS:S.delay+S.dIn,outS,total:outS+(on?S.dOut:0)+S.tail,on}}
 
 /* ============================================================ images */
@@ -480,6 +483,7 @@ function drawUnit(ctx,S,Lay,u,s,cA,cB){
  if(s.skx)ctx.transform(1,0,Math.tan(clamp(s.skx,-85,85)*D2R),1,0,0);
  if(s.sx!==1||s.sy!==1)ctx.scale(s.sx,s.sy);
  if(pv)ctx.translate(-s.px,-s.py);
+ if(s.reveal&&s.reveal.a<1){if(s.reveal.a<=0){ctx.restore();return}clipCreativeReveal(ctx,u,s.reveal)}
  if(s.bar){const b=s.bar,bx0=-u.w/2-b.pad*G.E,bw=u.w+b.pad*2*G.E,by0=u.by0,bh=u.by1-u.by0;let r;switch(b.d){case'R':r=[bx0+bw*(1-b.b),by0,bw*(b.b-b.a),bh];break;case'T':r=[bx0,by0+bh*b.a,bw,bh*(b.b-b.a)];break;case'B':r=[bx0,by0+bh*(1-b.b),bw,bh*(b.b-b.a)];break;default:r=[bx0+bw*b.a,by0,bw*(b.b-b.a),bh]}
   const ga=ctx.globalAlpha;ctx.globalAlpha=1;ctx.fillStyle=b.c==='A'?S.color:S.colorB;if(r[2]>0&&r[3]>0)ctx.fillRect(...r);ctx.globalAlpha=ga}
  const main=mixRGB(cA,cB,clamp(s.mix));
@@ -522,45 +526,22 @@ new ResizeObserver(fitStage).observe($('#stageWrap'));
 
 let lastNow=performance.now();
 function tick(now){requestAnimationFrame(tick);const dt=Math.min(.1,(now-lastNow)/1000);lastNow=now;
- if(!exporting){const T={total:clipTotal()};if(playing){t+=dt;if(t>=T.total){if($('#cLoop').checked)t%=T.total;else{t=T.total;setPlay(false)}}dirty=true}
+ if(!exporting){const T={total:clipTotal()},range=previewBounds();if(playing){if(t<range.start||t>range.end)t=range.start;t+=dt;if(t>=range.end){if($('#cLoop').checked)t=range.start+(t-range.start)%(range.end-range.start);else{t=range.end;setPlay(false)}}dirty=true}
   if(t>T.total){t=T.total;dirty=true}
   if(dirty||S.loop.fx!=='none'&&playing){dirty=false;draw();updHead()}}}
 
 /* ============================================================ timeline */
 function fmtTC(t){const f=Math.floor(t*S.fps+1e-6),sec=Math.floor(f/S.fps),fr=f%S.fps;return`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}<span>:${String(fr).padStart(2,'0')}</span>`}
-// ponytail: durante un trascinamento la scala è congelata (TLD.scale), altrimenti la timeline "scappa" sotto il puntatore
-const TLD={scale:0};
-const SEGK=[['delay','Ritardo','',0],['dIn','Entrata','s-in',.05],['hold','Pausa','s-hold',0],['dOut','Uscita','s-out',.05],['tail','Coda','',0]];
-function drawTimeline(){const T=timing(S),D=TLD.scale||clipTotal(),pc=v=>v/D*100;
- let acc=0,sh='',hh='';for(const[k,n,c]of SEGK){if(k==='dOut'&&!T.on)continue;const d=S[k];acc+=d;sh+=`<div class="${c}" style="width:${pc(d)}%"><b>${n}</b>${d.toFixed(2)}s</div>`;hh+=`<span class="hd" data-k="${k}" style="left:${pc(acc)}%"></span>`}
- $('#segs').innerHTML=sh;$('#hds').innerHTML=hh;
- const step=1/S.fps,every=D>6?S.fps:Math.max(1,Math.round(S.fps/5)),lab=D<=3?.5:D<=12?1:D<=30?2:5;let h='';
- for(let f=0;f*step<=D;f+=every){h+=`<i class="${f%S.fps===0?'big':''}" style="left:${pc(f*step)}%"></i>`}
- for(let x=0;x<=D+1e-6;x+=lab)h+=`<b style="left:${pc(x)}%">${+x.toFixed(1)}s</b>`;$('#ticks').innerHTML=h;
- $('#kfs').innerHTML=S.block.mode==='keys'?(S.block.keys||[]).map((k,i)=>`<i data-i="${i}" class="${k===UI.selKey?'sel':''}" style="left:${clamp(k.t/D)*100}%" title="Keyframe ${(+k.t).toFixed(2)} s · trascina per spostarlo"></i>`).join(''):'';
- updHead()}
-function updHead(){const T={total:clipTotal()},D=TLD.scale||T.total;$('#ph').style.left=(clamp(t/D)*100)+'%';$('#tc').innerHTML=fmtTC(t)+` <span>/ ${T.total.toFixed(2)}s</span>`}
-(function(){const tl=$('#tl');let mode=null,info=null;
- const xAt=e=>{const r=tl.getBoundingClientRect();return(e.clientX-r.left)/r.width*(TLD.scale||clipTotal())};
- const snapF=v=>Math.round(v*S.fps)/S.fps;
- const scrub=e=>{const tot=clipTotal(),r=tl.getBoundingClientRect();t=clamp(xAt(e),0,tot);if(S.block.mode==='keys')for(const k of S.block.keys||[])if(Math.abs(k.t/tot*r.width-(e.clientX-r.left))<6){t=clamp(k.t,0,tot);break}dirty=true};
- tl.addEventListener('pointerdown',e=>{tl.setPointerCapture(e.pointerId);setPlay(false);const hd=e.target.closest('.hd'),kd=e.target.closest('.kfs i');
-  if(hd){const key=hd.dataset.k,on=timing(S).on;let start=0;for(const[k]of SEGK){if(k===key)break;if(k!=='dOut'||on)start+=S[k]}info={key,start,min:SEGK.find(x=>x[0]===key)[3],el:hd};hd.classList.add('on');mode='seg';TLD.scale=clipTotal()}
-  else if(kd){const key=S.block.keys[+kd.dataset.i];if(!key)return;info={key};UI.selKey=key;t=clamp(key.t,0,clipTotal());dirty=true;mode='key';TLD.scale=clipTotal();drawTimeline()}
-  else{mode='scrub';scrub(e)}});
- tl.addEventListener('pointermove',e=>{if(!mode)return;if(mode==='scrub')return scrub(e);
-  if(mode==='seg'){const v=+Math.max(info.min,snapF(xAt(e)-info.start)).toFixed(4);if(v!==S[info.key]){S[info.key]=v;UI.time?.[info.key]?._set(v);drawTimeline();tl.querySelector(`.hd[data-k="${info.key}"]`)?.classList.add('on');dirty=true}}
-  else{const v=+clamp(snapF(xAt(e)),0,clipTotal()).toFixed(4);if(v!==info.key.t){info.key.t=v;t=v;drawTimeline();dirty=true}}});
- const end=()=>{if(!mode)return;const m=mode;mode=null;TLD.scale=0;drawTimeline();if(m==='key')buildBlock();if(m!=='scrub')histMark()};
- tl.addEventListener('pointerup',end);tl.addEventListener('pointercancel',end)})();
+// Multitrack editor, markers and preview range: timeline.js
 function setPlay(v){playing=v;$('#bPlay').classList.toggle('on',v)}
 const stepF=n=>{setPlay(false);t=clamp(Math.round(t*S.fps+n)/S.fps,0,clipTotal());dirty=true};
-$('#bPlay').onclick=()=>{if(!playing&&t>=clipTotal()-1e-6)t=0;setPlay(!playing)};
+$('#bPlay').onclick=()=>{const r=previewBounds();if(!playing&&(t<r.start||t>=r.end-1e-6))t=r.start;setPlay(!playing)};
 $('#bStart').onclick=()=>{t=0;dirty=true};$('#bPrev').onclick=()=>stepF(-1);$('#bNext').onclick=()=>stepF(1);
 $('#cGuide').onchange=()=>dirty=true;
 addEventListener('keydown',e=>{const mod=e.metaKey||e.ctrlKey,k=e.key.toLowerCase(),txt=e.target.closest('textarea,input[type=text],input[type=search],input[type=number],input.hex');
  if(mod&&k==='z'&&!txt){e.preventDefault();e.shiftKey?redo():undo();return}
  if(mod&&k==='y'&&!txt){e.preventDefault();redo();return}
+ if(timelineKeydown(e,txt))return;
  if(mod&&k==='s'){e.preventDefault();$('#bSave').click();return}
  if(e.key==='Escape'){$('#help').classList.remove('on');menu.classList.remove('on');return}
  if(e.target.closest('input,textarea,select')||mod||e.altKey)return;
@@ -712,19 +693,19 @@ function buildBlocksUI(){const sec=section('Blocchi di testo',true);UI.blkSec=se
  refreshBlocks()}
 
 /* ============================================================ keyframes UI */
-function addKey(){const b=S.block;if(b.mode!=='keys'){b.mode='keys';b.keys=b.keys||[]}const ex=b.keys.find(k=>Math.abs(k.t-t)<.5/S.fps);
- if(ex)UI.selKey=ex;else{const c=keyAt(b.keys,t),k={t:+t.toFixed(3),x:c.x,y:c.y,s:c.s,r:c.r,op:c.op,ease:'inOutCubic'};b.keys.push(k);UI.selKey=k}
+function addKey(){TLD.marker=null;const b=S.block;if(b.mode!=='keys'){b.mode='keys';b.keys=b.keys||[]}const ex=b.keys.find(k=>Math.abs(k.t-t)<.5/S.fps);
+ if(ex)UI.selKey=ex;else{const c=keyAt(b.keys,t),k={t:frameTime(t),x:c.x,y:c.y,s:c.s,r:c.r,op:c.op,ease:'inOutCubic'};b.keys.push(k);UI.selKey=k}
  const sec=UI.blockSub&&UI.blockSub.closest('details');if(sec)sec.open=true;buildBlock();onR();toast('Keyframe a '+t.toFixed(2)+' s')}
 function buildKeys(sub,bm){
- const bl=el('div','bline'),add=el('button','btn sm','+ Keyframe alla testina'),clr=el('button','btn sm','Elimina tutti');add.type=clr.type='button';add.onclick=addKey;clr.onclick=()=>{bm.keys=[];buildBlock();onR()};bl.append(add,clr);sub.appendChild(bl);
+ const bl=el('div','bline'),add=el('button','btn sm','+ Keyframe alla testina'),clr=el('button','btn sm','Elimina tutti');add.type=clr.type='button';add.onclick=addKey;clr.onclick=()=>{bm.keys=[];UI.selKey=null;buildBlock();onR()};bl.append(add,clr);sub.appendChild(bl);
  sub.appendChild(el('div','note','Ogni keyframe fissa posizione, scala, rotazione e opacità del blocco in un istante. Tra due keyframe il testo si muove con la curva del keyframe di arrivo. Tasto K: aggiungi alla testina. I rombi sulla timeline sono i keyframe.'));
  [...bm.keys].sort((a,b)=>a.t-b.t).forEach((k,i)=>{const d=el('details','lyr');d.open=k===UI.selKey;const sm=el('summary',null,`Keyframe ${i+1} `),sn=el('span','fxn');const lbl=()=>sn.textContent=(+k.t).toFixed(2)+' s';lbl();sm.appendChild(sn);d.appendChild(sm);const lb=el('div','body');d.appendChild(lb);
   const cb=kk=>{if(kk==='t')lbl();onR()};
   [rng('t','Tempo',0,30,0,.01,'s'),rng('x','Spost. X',-150,150,0,.5,'%'),rng('y','Spost. Y',-150,150,0,.5,'%'),rng('s','Scala',0,6,1,.01,'×'),rng('r','Rotazione',-720,720,0,.5,'°'),rng('op','Opacità',0,1,1,.01),sel('ease','Curva in arrivo',EZ_LIST.slice(1),'inOutCubic')].forEach(x=>lb.appendChild(field(x,k,cb)));
   const bb=el('div','bline'),go=el('button','btn sm','Vai qui'),dup=el('button','btn sm','Duplica alla testina'),del=el('button','btn sm','Elimina');go.type=dup.type=del.type='button';
-  go.onclick=()=>{setPlay(false);t=clamp(k.t,0,clipTotal());dirty=true;UI.selKey=k};
-  dup.onclick=()=>{const n={...k,t:+t.toFixed(3)};bm.keys.push(n);UI.selKey=n;buildBlock();onR()};
-  del.onclick=()=>{bm.keys.splice(bm.keys.indexOf(k),1);buildBlock();onR()};
+  go.onclick=()=>{setPlay(false);t=clamp(k.t,0,clipTotal());dirty=true;UI.selKey=k;TLD.marker=null;drawTimeline()};
+  dup.onclick=()=>pasteTimelineKey(k);
+  del.onclick=()=>{bm.keys.splice(bm.keys.indexOf(k),1);if(UI.selKey===k)UI.selKey=null;buildBlock();onR()};
   bb.append(go,dup,del);lb.appendChild(bb);sub.appendChild(d)})}
 
 /* ============================================================ images UI */
@@ -777,7 +758,7 @@ $('#q').oninput=()=>{const q=$('#q').value.trim().toLowerCase();document.querySe
 function thumbState(f,isLoop){const r=f.rec||{};const T={...defaults(),text:'Aa',font:0,wght:700,fs:40,fit:false,track:-10,lh:1,color:'#ebe8e3',colorB:'#ff4d00',bg:'#0d0d0d',margin:0,seed:S.seed,fps:30,delay:0,dIn:1,hold:.7,dOut:.8,tail:.3,outMode:'mirror'};
  if(isLoop){T.inS=mkSlot('fade',{split:'char',stagger:0});T.dIn=.01;T.delay=0;T.hold=3;T.outMode='none';T.tail=0;T.loop={fx:f.id,when:'always',prms:{}};const o=prmOf(T.loop,LMAP);if(o.amp!=null&&f.id==='wave')o.amp=.18;if(f.id==='jitter')o.amp=4;if(f.id==='neon')o.prob=.25;if(f.id==='tglitch')o.prob=.2;if(f.id==='breathe')o.amp=.12;if(f.id==='float')o.amp=.12}
  else if(f.exit){T.inS=mkSlot('fade',{split:'all',stagger:0});T.dIn=.15;T.hold=.35;T.outMode='custom';T.outS=mkSlot(f.id,{split:'char',stagger:Math.min(.5,r.stagger??.3),order:'start'});T.dOut=1.8;T.tail=.4}
- else{T.inS=mkSlot(f.id,{split:r.split==='word'||r.split==='line'?'char':(r.split||'char'),stagger:r.stagger??.4,order:r.order||'start'});if(f.id==='type'||f.id==='scramble'){T.inS.stagger=.9}}
+ else{T.inS=mkSlot(f.id,{split:f.c==='Studio · maschere'?'all':r.split==='word'||r.split==='line'?'char':(r.split||'char'),stagger:r.stagger??.4,order:r.order||'start'});if(f.id==='type'||f.id==='scramble'){T.inS.stagger=.9}}
  return T}
 const tctxCache=new WeakMap();
 function drawThumb(c,f,isLoop,tt){let ctx2=tctxCache.get(c);if(!ctx2){ctx2=c.getContext('2d');tctxCache.set(c,ctx2)}const T=c._T||(c._T=thumbState(f,isLoop));T.seed=S.seed;const W=126,H=52;if(!c._L)c._L=layout(T,ctx2,W,H);renderFrame(ctx2,T,c._L,tt,W,H,2)}
@@ -809,7 +790,7 @@ async function applyPreset(d,quiet){{const base=defaults();if(d.block&&d.block.o
   if(Array.isArray(d.blocks)&&d.blocks.length>1){N.blocks=d.blocks.filter(b=>b&&typeof b==='object').map(b=>{const o=Object.assign(pickText(base),b,{block:{...base.block,...(b.block||{})},loop:{...base.loop,...(b.loop||{})},inS:{...base.inS,...(b.inS||{})},outS:{...base.outS,...(b.outS||{})}});
    if(typeof o.text!=='string')o.text='';if(!FXMAP[o.inS.fx])o.inS.fx='mask';if(!FXMAP[o.outS.fx])o.outS.fx='fade';if(!LMAP[o.loop.fx])o.loop.fx='none';o.block.keys=Array.isArray(o.block.keys)?o.block.keys.filter(k=>k&&['t','x','y','s','r','op'].every(f=>typeof k[f]==='number')):[];if(typeof o.font!=='number'||!FONTS[o.font])o.font=0;return o});
    N.cur=clamp(Math.round(+N.cur||0),0,N.blocks.length-1);if(N.blocks.length<2){N.blocks=[];N.cur=0}}else{N.blocks=[];N.cur=0}
-  await Promise.all(N.images.map(loadImg));S=N;buildTop();buildInspector();loadFonts().then(relayout);relayout();markTiles();buildThumbs();t=0;histMark();if(!quiet)toast(d.fontName&&fi<0?'Preset caricato. Font "'+d.fontName+'" non trovato, sostituito':'Preset caricato')}}
+  await Promise.all(N.images.map(loadImg));S=N;normalizeTimeline();UI.selKey=null;TLD.marker=null;TLD.scale=0;buildTop();buildInspector();loadFonts().then(relayout);relayout();markTiles();buildThumbs();t=0;histMark();if(!quiet)toast(d.fontName&&fi<0?'Preset caricato. Font "'+d.fontName+'" non trovato, sostituito':'Preset caricato')}}
 
 /* ============================================================ history + autosave */
 // ponytail: snapshot JSON dell'intero stato, immagini escluse (restano in IMGS). Tetto 80 passi.
@@ -819,7 +800,7 @@ function snapNorm(){prmOf(S.inS,FXMAP);prmOf(S.outS,FXMAP);prmOf(S.loop,LMAP);(S
 const snap=()=>{snapNorm();return JSON.stringify({...S,images:S.images.map(x=>({id:x.id,name:x.name})),fontName:FONTS[S.font]?.n})};
 const snapKey=j=>{const o=JSON.parse(j);if(o.fit)delete o.fs;return JSON.stringify(o)};
 function histMark(){clearTimeout(HIST.tm);HIST.tm=setTimeout(histCommit,350)}
-function histCommit(){if(HIST.busy||exporting)return;const cur=snap();if(HIST.last!==null&&snapKey(cur)===snapKey(HIST.last)){HIST.last=cur;return}if(HIST.last!==null){HIST.u.push(HIST.last);if(HIST.u.length>80)HIST.u.shift();HIST.r.length=0}HIST.last=cur;histUI();autosave()}
+function histCommit(){if(HIST.busy||exporting||TLD.drag)return;const cur=snap();if(HIST.last!==null&&snapKey(cur)===snapKey(HIST.last)){HIST.last=cur;return}if(HIST.last!==null){HIST.u.push(HIST.last);if(HIST.u.length>80)HIST.u.shift();HIST.r.length=0}HIST.last=cur;histUI();autosave()}
 function histUI(){$('#bUndo').disabled=!HIST.u.length;$('#bRedo').disabled=!HIST.r.length}
 async function histGo(from,to,msg){clearTimeout(HIST.tm);histCommit();if(!from.length)return;to.push(HIST.last);const st=from.pop();HIST.busy=true;
  try{const d=JSON.parse(st);d.images=d.images.filter(x=>IMGS[x.id]).map(x=>({...x,src:IMGS[x.id].src}));await applyPreset(d,true)}finally{HIST.busy=false}
@@ -900,7 +881,7 @@ function zip(files){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
 addEventListener('dragover',e=>{if([...e.dataTransfer.items].some(i=>i.kind==='file'))e.preventDefault()});
 addEventListener('drop',e=>{const all=[...e.dataTransfer.files];if(!all.length)return;e.preventDefault();const fs=all.filter(f=>/^image\//.test(f.type)),js=all.find(f=>/\.json$/i.test(f.name)||f.type==='application/json');if(fs.length){UI.imgSec.d.open=true;addImages(fs)}else if(js)loadPreset(js);else toast('Formato non supportato: trascina immagini o un preset .json')});
 addEventListener('paste',e=>{if(e.target.closest('input,textarea'))return;const fs=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));if(fs.length){UI.imgSec.d.open=true;addImages(fs)}});
-buildTop();buildInspector();buildLib();relayout();fitStage();setPlay(true);requestAnimationFrame(tick);
+initTimeline();buildTop();buildInspector();buildLib();relayout();fitStage();setPlay(true);requestAnimationFrame(tick);
 if(window.lucide)lucide.createIcons();
 (async()=>{let d=null;try{d=JSON.parse(localStorage.getItem(AUTOSAVE)||'null')}catch(e){}
  if(d){try{await applyPreset(d,true);toast('Progetto ripristinato dall\'ultima sessione')}catch(e){S=defaults();buildInspector();relayout()}}
